@@ -1,6 +1,5 @@
 {
-  "name": "polymarket-builder-dashboard",
   "version": 2,
   "buildCommand": "",
-  "outputDirectory": "public"
+  "outputDirectory": "."
 }
