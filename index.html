@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polymarket Builder Leaderboard Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; overflow-x: hidden; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        /* ===== SCROLL ANIMATIONS ===== */
+        .animate-in {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .animate-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .animate-in.delay-1 { transition-delay: 0.08s; }
+        .animate-in.delay-2 { transition-delay: 0.16s; }
+        .animate-in.delay-3 { transition-delay: 0.24s; }
+        .animate-in.delay-4 { transition-delay: 0.32s; }
+
+        /* ===== HEADER ===== */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid #1a1a2e; margin-bottom: 24px; opacity: 0; animation: headerFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards; }
+        @keyframes headerFadeIn { to { opacity: 1; } }
+        header h1 { font-size: 24px; color: #fff; }
+        header h1 span { color: #4f6ef7; background: linear-gradient(135deg, #4f6ef7, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { color: #888; font-size: 13px; margin-top: 4px; }
+        .filters { display: flex; gap: 12px; align-items: center; }
+        .filters select { background: #1a1a2e; border: 1px solid #2a2a4e; color: #e0e0e0; padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.3s ease; }
+        .filters select:hover { border-color: #4f6ef7; box-shadow: 0 0 12px rgba(79,110,247,0.2); }
+        .filters select:focus { outline: none; border-color: #4f6ef7; box-shadow: 0 0 16px rgba(79,110,247,0.3); }
+
+        /* ===== KPI CARDS ===== */
+        .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+        .kpi-card { background: #12121e; border: 1px solid #1a1a2e; border-radius: 12px; padding: 20px; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden; }
+        .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, #4f6ef7, #7c3aed); opacity: 0; transition: opacity 0.4s ease; }
+        .kpi-card:hover { transform: translateY(-4px); border-color: #2a2a4e; box-shadow: 0 8px 32px rgba(79,110,247,0.1); }
+        .kpi-card:hover::before { opacity: 1; }
+        .kpi-card .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .kpi-card .value { font-size: 28px; font-weight: 700; color: #fff; }
+        .kpi-card .change { font-size: 12px; margin-top: 4px; }
+        .kpi-card .change.up { color: #22c55e; }
+        .kpi-card .change.down { color: #ef4444; }
+        .kpi-card .change.neutral { color: #888; }
+
+        /* ===== CHARTS ===== */
+        .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .chart-card { background: #12121e; border: 1px solid #1a1a2e; border-radius: 12px; padding: 20px; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .chart-card:hover { border-color: #2a2a4e; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+        .chart-card.full { grid-column: 1 / -1; }
+        .chart-card h3 { font-size: 15px; color: #fff; margin-bottom: 4px; }
+        .chart-card .chart-subtitle { font-size: 12px; color: #888; margin-bottom: 16px; }
+        .chart-wrapper { position: relative; height: 320px; }
+        .chart-wrapper.tall { height: 450px; }
+        /* Click hint */
+        .chart-card .click-hint { font-size: 11px; color: #555; text-align: right; margin-top: 8px; opacity: 0; transition: opacity 0.3s ease; }
+        .chart-card:hover .click-hint { opacity: 1; }
+
+        /* ===== SECTION HEADERS ===== */
+        .section-title { font-size: 18px; color: #fff; margin: 32px 0 16px; padding-bottom: 8px; border-bottom: 1px solid #1a1a2e; }
+        .section-title span { color: #4f6ef7; background: linear-gradient(135deg, #4f6ef7, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* ===== TABLES ===== */
+        .table-card { background: #12121e; border: 1px solid #1a1a2e; border-radius: 12px; padding: 20px; overflow-x: auto; margin-bottom: 24px; }
+        .table-card h3 { font-size: 15px; color: #fff; margin-bottom: 4px; }
+        .table-card .table-subtitle { font-size: 12px; color: #888; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th { text-align: left; padding: 10px 12px; color: #888; font-weight: 600; border-bottom: 1px solid #1a1a2e; cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.2s ease; }
+        thead th:hover { color: #4f6ef7; }
+        thead th.sorted-asc::after { content: ' â²'; color: #4f6ef7; }
+        thead th.sorted-desc::after { content: ' â¼'; color: #4f6ef7; }
+        tbody td { padding: 10px 12px; border-bottom: 1px solid #0f0f1a; white-space: nowrap; transition: all 0.25s ease; }
+        tbody tr { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); cursor: pointer; }
+        tbody tr:hover { background: linear-gradient(90deg, rgba(79,110,247,0.08), transparent); transform: scale(1.005); }
+        tbody tr.row-highlight { background: rgba(79,110,247,0.12) !important; box-shadow: inset 3px 0 0 #4f6ef7; }
+        .rank-badge { display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center; border-radius: 6px; font-weight: 700; font-size: 12px; transition: transform 0.3s ease; }
+        tbody tr:hover .rank-badge { transform: scale(1.15); }
+        .rank-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #000; box-shadow: 0 0 8px rgba(251,191,36,0.3); }
+        .rank-2 { background: linear-gradient(135deg, #94a3b8, #64748b); color: #000; }
+        .rank-3 { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; }
+        .rank-other { background: #1a1a2e; color: #888; }
+        .trend-up { color: #22c55e; font-weight: 600; }
+        .trend-down { color: #ef4444; font-weight: 600; }
+        .trend-neutral { color: #888; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; transition: transform 0.2s ease; }
+        .tag:hover { transform: scale(1.1); }
+        .tag-rising { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .tag-declining { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .tag-hot { background: rgba(249,115,22,0.15); color: #f97316; }
+        .tag-new { background: rgba(79,110,247,0.15); color: #4f6ef7; }
+        .tag-momentum { background: rgba(168,85,247,0.15); color: #a855f7; }
+        .vol-bar { display: inline-block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #4f6ef7, #7c3aed); vertical-align: middle; margin-left: 8px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+
+        /* ===== INSIGHTS ===== */
+        .insights-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .insight-card { background: #12121e; border: 1px solid #1a1a2e; border-radius: 12px; padding: 20px; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .insight-card:hover { transform: translateY(-2px); border-color: #2a2a4e; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+        .insight-card h4 { font-size: 14px; color: #fff; margin-bottom: 12px; }
+        .insight-card .insight-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #0f0f1a; transition: all 0.25s ease; }
+        .insight-card .insight-item:hover { padding-left: 6px; background: rgba(255,255,255,0.02); }
+        .insight-card .insight-item:last-child { border-bottom: none; }
+        .insight-card .builder-name { font-size: 13px; color: #e0e0e0; }
+        .insight-card .builder-stat { font-size: 13px; font-weight: 600; }
+
+        /* ===== GLOW PULSE for #1 ===== */
+        @keyframes glowPulse { 0%, 100% { box-shadow: 0 0 8px rgba(251,191,36,0.3); } 50% { box-shadow: 0 0 16px rgba(251,191,36,0.6); } }
+        .rank-1 { animation: glowPulse 2s ease-in-out infinite; }
+
+        /* ===== SCROLL PROGRESS BAR ===== */
+        .scroll-progress { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, #4f6ef7, #7c3aed, #ec4899); z-index: 1000; transition: width 0.1s linear; border-radius: 0 2px 2px 0; }
+
+        /* ===== BACK TO TOP ===== */
+        .back-to-top { position: fixed; bottom: 30px; right: 30px; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #4f6ef7, #7c3aed); color: #fff; border: none; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; opacity: 0; transform: translateY(20px); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); z-index: 999; box-shadow: 0 4px 16px rgba(79,110,247,0.4); }
+        .back-to-top.show { opacity: 1; transform: translateY(0); }
+        .back-to-top:hover { transform: translateY(-3px) scale(1.1); box-shadow: 0 6px 24px rgba(79,110,247,0.6); }
+
+        footer { text-align: center; padding: 20px 0; color: #555; font-size: 12px; border-top: 1px solid #1a1a2e; margin-top: 40px; }
+
+        @media (max-width: 1024px) {
+            .kpi-row { grid-template-columns: repeat(3, 1fr); }
+            .chart-row { grid-template-columns: 1fr; }
+            .insights-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="scroll-progress" id="scrollProgress"></div>
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0})">â</button>
+
+<div class="container">
+    <header>
+        <div>
+            <h1><span>Polymarket</span> Builder Leaderboard Analysis</h1>
+            <div class="subtitle">Data extracted: 2026-03-25 | Top 50 builders across Daily / Weekly / Monthly / All-time</div>
+        </div>
+        <div class="filters">
+            <select id="viewFilter">
+                <option value="all">All Builders (Top 50)</option>
+                <option value="rising">Rising Stars</option>
+                <option value="declining">Declining</option>
+                <option value="hot">Hot Today</option>
+                <option value="momentum">High Momentum</option>
+            </select>
+        </div>
+    </header>
+
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <div class="chart-row">
+        <div class="chart-card animate-in">
+            <h3>Volume Distribution by Timeframe</h3>
+            <div class="chart-subtitle">Top 10 builders â volume across Day/Week/Month/All</div>
+            <div class="chart-wrapper"><canvas id="chartVolume"></canvas></div>
+            <div class="click-hint">Click any bar to highlight</div>
+        </div>
+        <div class="chart-card animate-in delay-1">
+            <h3>Rank Movement: Month vs All-time</h3>
+            <div class="chart-subtitle">Positive = rising (ææåä¼äºå¨ææå), Negative = declining</div>
+            <div class="chart-wrapper"><canvas id="chartRankChange"></canvas></div>
+            <div class="click-hint">Click any bar to highlight</div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card animate-in">
+            <h3>Monthly Momentum (æVolumeå All-timeç¾åæ¯)</h3>
+            <div class="chart-subtitle">Higher % = more recent growth. Projects doing most of their volume this month.</div>
+            <div class="chart-wrapper"><canvas id="chartMomentum"></canvas></div>
+            <div class="click-hint">Click any bar to highlight</div>
+        </div>
+        <div class="chart-card animate-in delay-1">
+            <h3>Active Users vs Volume (Monthly)</h3>
+            <div class="chart-subtitle">Bubble size = volume. X = users, Y = volume</div>
+            <div class="chart-wrapper"><canvas id="chartBubble"></canvas></div>
+            <div class="click-hint">Click any bubble to highlight</div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card full animate-in">
+            <h3>Market Concentration</h3>
+            <div class="chart-subtitle">Top 50 builders by monthly volume â shows how concentrated the market is</div>
+            <div class="chart-wrapper"><canvas id="chartConcentration"></canvas></div>
+            <div class="click-hint">Click any bar to highlight</div>
+        </div>
+    </div>
+
+    <h2 class="section-title animate-in">ð Key <span>Insights</span></h2>
+    <div class="insights-grid" id="insightsGrid"></div>
+
+    <h2 class="section-title animate-in">ð Complete <span>Leaderboard</span> Comparison</h2>
+    <div class="table-card animate-in">
+        <h3>Cross-Timeframe Rankings</h3>
+        <div class="table-subtitle">Click column headers to sort Â· Click rows to highlight Â· Use filter to narrow results</div>
+        <table id="mainTable">
+            <thead>
+                <tr>
+                    <th data-col="rank_MONTH">#</th>
+                    <th data-col="builder">Project</th>
+                    <th data-col="vol_MONTH">Month Vol</th>
+                    <th data-col="vol_WEEK">Week Vol</th>
+                    <th data-col="vol_DAY">Day Vol</th>
+                    <th data-col="rank_DAY">Day Rank</th>
+                    <th data-col="rank_WEEK">Week Rank</th>
+                    <th data-col="rank_ALL">All Rank</th>
+                    <th data-col="rank_change">Trend</th>
+                    <th data-col="month_pct">M%/All</th>
+                    <th data-col="users_MONTH">Users(M)</th>
+                    <th data-col="tags">Tags</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <footer>
+        SmartX Research | Polymarket Builder Program Leaderboard Analysis | Generated 2026-03-25
+    </footer>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const DAY = [["1","betmoar",1701595,92],["2","PolyCop",533536,452],["3","Polygun",224254,447],["4","Kreo",179076,238],["5","standtrade",134426,60],["6","Chance",130103,4],["7","polytraderpro",116357,6],["8","polymtrade",93923,120],["9","Gate",73315,1],["10","PolyBot",54529,63],["11","Jupiter",53755,1],["12","Bullpen",48003,19],["13","FORS",47315,1],["14","Olympusx.app",41850,92],["15","Simmer.Markets",28438,60],["16","swaps.xyz",26959,13],["17","Predex",26112,120],["18","Polymer",25833,118],["19","PolyMaker.bet",23763,3],["20","PolyHelper.io",22874,6],["21","Polytrader.app",20153,3],["22","EVplusAI",19946,23],["23","preda",19625,1],["24","Tailgate",16352,9],["25","Ask Gina",13619,7],["26","Wen.market",12334,3],["27","Coinpilot",11564,35],["28","Synthesis.Trade",11062,22],["29","MetEngine",10195,8],["30","AIxBET",9914,7],["31","DoubleUp",8177,1],["32","Onsight",7832,35],["33","Rainbow",7599,25],["34","Polydupe",7386,6],["35","NoArb",7303,5],["36","almanac.market",7179,3],["37","okbet",6884,1],["38","DGPredict",6838,3],["39","Sharkbetting.com",6807,1],["40","Fortuna",6474,14],["41","Bankr",5837,3],["42","Polymarket Eye",5682,2],["43","Ultramarkets",5561,2],["44","fireplace",5413,7],["45","Polycool",5276,8],["46","Kiyotaka",5198,4],["47","PolyCrypto Bot",4856,19],["48","PolyGold.Trade",4640,6],["49","Polycule",4523,3],["50","SpectraView",3977,2]];
+const WEEK = [["1","betmoar",25019771,321],["2","PolyCop",10528136,1341],["3","Polygun",4895075,1433],["4","polymtrade",3857766,1397],["5","standtrade",3334305,183],["6","Kreo",2451390,859],["7","polytraderpro",2123550,19],["8","swaps.xyz",1192756,197],["9","Olympusx.app",1077635,199],["10","Polymer",1011363,185],["11","Gate",953133,1],["12","Jupiter",839852,1],["13","Chance",815315,106],["14","Bullpen",764918,112],["15","Simmer.Markets",549772,267],["16","EVplusAI",532135,43],["17","Sharkbetting.com",529688,4],["18","PolyMaker.bet",515625,6],["19","PolyBot",484943,238],["20","okbet",462904,8],["21","Ask Gina",456264,21],["22","PolyHelper.io",419286,29],["23","Predex",397660,224],["24","DGPredict",380136,10],["25","Polytrader.app",322013,13],["26","Polycule",315949,81],["27","FORS",230094,7],["28","NoArb",222767,10],["29","Polydupe",221798,35],["30","Tailgate",218558,33],["31","Onsight",207775,75],["32","PolyGold.Trade",193497,6],["33","Coinpilot",192665,106],["34","Polymarket Eye",191649,14],["35","Wen.market",180893,16],["36","Rainbow",173428,96],["37","AIxBET",163561,11],["38","fireplace",161735,34],["39","MetEngine",151397,19],["40","almanac.market",134651,18],["41","Polycool",118936,22],["42","DoubleUp",105878,13],["43","Synthesis.Trade",105605,46],["44","Kiyotaka",102698,14],["45","PolyCrypto Bot",93254,27],["46","Fortuna",91958,28],["47","Ultramarkets",87965,10],["48","SpectraView",87281,9],["49","Bankr",78803,9],["50","UnifAI Network",74920,1]];
+const MONTH = [["1","betmoar",217561931,859],["2","PolyCop",56531627,3086],["3","polymtrade",30660696,4757],["4","Polygun",29272894,3666],["5","polytraderpro",18965462,46],["6","standtrade",18036914,368],["7","Kreo",13804414,1851],["8","Chance",10784177,479],["9","Polymer",8050136,214],["10","Jupiter",6176104,2],["11","Bullpen",5983581,292],["12","Olympusx.app",5420389,271],["13","EVplusAI",3744683,49],["14","PolyMaker.bet",3684353,13],["15","Onsight",3405444,253],["16","Polytrader.app",3393607,28],["17","swaps.xyz",3292849,873],["18","PolyBot",3287466,531],["19","Polydupe",3059421,63],["20","Simmer.Markets",2971204,753],["21","Sharkbetting.com",2452496,4],["22","Polycule",2110337,272],["23","DGPredict",1995544,31],["24","Polymarket Eye",1937507,46],["25","Ask Gina",1693723,42],["26","Rainbow",1499636,518],["27","okbet",1418823,51],["28","PolyHelper.io",1345565,73],["29","fireplace",1258505,95],["30","NoArb",1242853,31],["31","Synthesis.Trade",1148927,131],["32","Tailgate",1140483,100],["33","Predex",1112098,427],["34","almanac.market",1082927,48],["35","FORS",967178,17],["36","Coinpilot",961510,234],["37","Gate",936544,1],["38","Based",840465,18],["39","Ultramarkets",709672,36],["40","Fortuna",665744,71],["41","Ares",629319,91],["42","DoubleUp",620819,41],["43","Kiyotaka",543980,22],["44","Polycool",542040,42],["45","Wen.market",536767,43],["46","PolyCrypto Bot",535518,46],["47","Bankr",511008,24],["48","SpectraView",466481,17],["49","UnifAI",322485,4],["50","PolyGold.Trade",297186,22]];
+const ALL = [["1","betmoar",830088239,2140],["2","PolyCop",139020683,5683],["3","polytraderpro",109840771,80],["4","standtrade",95270230,847],["5","polymtrade",90852765,13212],["6","Polygun",65696802,6322],["7","Polycule",40899640,2984],["8","Bullpen",20211742,694],["9","Based",19330010,2450],["10","Chance",18796544,2116],["11","PolyBot",18142655,1419],["12","Polytrader.app",17826690,44],["13","Kreo",16173883,2213],["14","Olympusx.app",13649300,373],["15","Jupiter",10174528,2],["16","okbet",8941559,380],["17","Polydupe",8646537,175],["18","Polymer",8487685,214],["19","Matchr.xyz",7625065,45],["20","Sharkbetting.com",5246001,6],["21","Simmer.Markets",5218792,1110],["22","Rainbow",5211343,2219],["23","UnifAI Network",5184012,512],["24","Synthesis.Trade",5033315,524],["25","swaps.xyz",4849162,1177],["26","fireplace",4755889,315],["27","PolyMaker.bet",4726079,17],["28","Onsight",4084078,388],["29","EVplusAI",4050318,49],["30","almanac.market",3577863,145],["31","Polymarket Eye",3548858,56],["32","Polyfollow",3218833,316],["33","Ratio.youtube",2882693,19],["34","Ask Gina",2765723,71],["35","NoArb",2650416,44],["36","DGPredict",2464804,36],["37","FORS",2362437,51],["38","Tailgate",2319891,173],["39","PolyHelper.io",2289281,117],["40","Predex",1806032,617],["41","Coinpilot",1715458,358],["42","Gate",1587267,1],["43","Fortuna",1547929,113],["44","Wen.market",1360025,82],["45","Kiyotaka",1315395,50],["46","PolyCrypto Bot",1166735,78],["47","Ultramarkets",1093966,68],["48","DoubleUp",1064965,63],["49","Polycool",1034753,69],["50","SpectraView",803972,27]];
+
+// ============================================================
+// PROCESS DATA
+// ============================================================
+function buildLookup(data, periodName) {
+    const lookup = {};
+    data.forEach(d => { lookup[d[1]] = { rank: parseInt(d[0]), volume: d[2], users: d[3], period: periodName }; });
+    return lookup;
+}
+const dayLookup = buildLookup(DAY, 'DAY');
+const weekLookup = buildLookup(WEEK, 'WEEK');
+const monthLookup = buildLookup(MONTH, 'MONTH');
+const allLookup = buildLookup(ALL, 'ALL');
+
+const builders = MONTH.map(m => {
+    const name = m[1], d = dayLookup[name]||{}, w = weekLookup[name]||{}, a = allLookup[name]||{};
+    const monthVol = m[2], allVol = a.volume||0;
+    const monthPct = allVol > 0 ? (monthVol/allVol*100) : 0;
+    const rankChange = (a.rank||0) - parseInt(m[0]);
+    const weekDayChange = (w.rank||0) - (d.rank||0);
+    const tags = [];
+    if (rankChange >= 5) tags.push('rising');
+    if (rankChange <= -5) tags.push('declining');
+    if (weekDayChange >= 5) tags.push('hot');
+    if (monthPct > 80) tags.push('momentum');
+    if (!a.rank) tags.push('new');
+    return { builder:name, rank_DAY:d.rank||null, rank_WEEK:w.rank||null, rank_MONTH:parseInt(m[0]), rank_ALL:a.rank||null, vol_DAY:d.volume||0, vol_WEEK:w.volume||0, vol_MONTH:monthVol, vol_ALL:allVol, users_DAY:d.users||0, users_WEEK:w.users||0, users_MONTH:m[3], users_ALL:a.users||0, month_pct:monthPct, rank_change:rankChange, week_day_change:weekDayChange, tags };
+});
+
+// ============================================================
+// UTILITY
+// ============================================================
+function fmtVol(v) {
+    if (v >= 1e9) return '$'+(v/1e9).toFixed(1)+'B';
+    if (v >= 1e6) return '$'+(v/1e6).toFixed(1)+'M';
+    if (v >= 1e3) return '$'+(v/1e3).toFixed(1)+'K';
+    return '$'+v.toFixed(0);
+}
+function fmtNum(n) { return n.toLocaleString(); }
+
+// ============================================================
+// SCROLL ANIMATIONS (IntersectionObserver)
+// ============================================================
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+        }
+    });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+
+// ============================================================
+// SCROLL PROGRESS BAR + BACK TO TOP
+// ============================================================
+window.addEventListener('scroll', () => {
+    const scrollPct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight) * 100;
+    document.getElementById('scrollProgress').style.width = scrollPct + '%';
+    document.getElementById('backToTop').classList.toggle('show', window.scrollY > 400);
+}, { passive: true });
+
+// ============================================================
+// CHART CLICK-TO-HIGHLIGHT PLUGIN
+// ============================================================
+const highlightPlugin = {
+    id: 'clickHighlight',
+    afterEvent(chart, args) {
+        if (args.event.type !== 'click') return;
+        const elements = chart.getElementsAtEventForMode(args.event, 'nearest', { intersect: true }, false);
+        if (elements.length === 0) {
+            // Click on empty area = reset
+            chart.data.datasets.forEach(ds => {
+                if (ds._originalBg) { ds.backgroundColor = ds._originalBg; ds.borderColor = ds._originalBorder; delete ds._originalBg; delete ds._originalBorder; }
+            });
+            chart.update('none');
+            return;
+        }
+        const clickedIdx = elements[0].index;
+        const clickedDsIdx = elements[0].datasetIndex;
+        chart.data.datasets.forEach((ds, dsIdx) => {
+            if (!ds._originalBg) {
+                ds._originalBg = Array.isArray(ds.backgroundColor) ? [...ds.backgroundColor] : ds.backgroundColor;
+                ds._originalBorder = Array.isArray(ds.borderColor) ? [...ds.borderColor] : ds.borderColor;
+            }
+            const origBg = ds._originalBg;
+            const origBorder = ds._originalBorder;
+            if (Array.isArray(origBg)) {
+                ds.backgroundColor = origBg.map((c, i) => i === clickedIdx ? c : dimColor(c, 0.15));
+                if (Array.isArray(origBorder)) ds.borderColor = origBorder.map((c, i) => i === clickedIdx ? c : dimColor(c, 0.15));
+            } else {
+                // Single color datasets â dim if not the clicked dataset
+                if (chart.data.datasets.length > 1) {
+                    ds.backgroundColor = dsIdx === clickedDsIdx ? origBg : dimColor(origBg, 0.2);
+                } else {
+                    // Turn into array for per-bar dimming
+                    const len = ds.data.length;
+                    ds.backgroundColor = Array.from({length: len}, (_, i) => i === clickedIdx ? origBg : dimColor(origBg, 0.15));
+                }
+            }
+        });
+        chart.update('none');
+    }
+};
+
+function dimColor(color, opacity) {
+    if (!color || typeof color !== 'string') return color;
+    // Handle hex
+    if (color.startsWith('#')) {
+        const r = parseInt(color.slice(1,3),16), g = parseInt(color.slice(3,5),16), b = parseInt(color.slice(5,7),16);
+        return `rgba(${r},${g},${b},${opacity})`;
+    }
+    // Handle rgba
+    if (color.startsWith('rgba')) {
+        return color.replace(/[\d.]+\)$/, opacity + ')');
+    }
+    // Handle rgb
+    if (color.startsWith('rgb(')) {
+        return color.replace('rgb(', 'rgba(').replace(')', `,${opacity})`);
+    }
+    return color;
+}
+
+Chart.register(highlightPlugin);
+
+// ============================================================
+// KPI CARDS with counter animation
+// ============================================================
+function animateCounter(el, target, prefix='', suffix='') {
+    const duration = 1200;
+    const start = performance.now();
+    const isNum = typeof target === 'number';
+    const numTarget = isNum ? target : parseFloat(target.replace(/[^0-9.]/g,''));
+    function tick(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const current = numTarget * eased;
+        if (numTarget >= 1e6) el.textContent = prefix + '$' + (current/1e6).toFixed(1) + 'M';
+        else if (numTarget >= 1e3) el.textContent = prefix + fmtNum(Math.round(current)) + suffix;
+        else el.textContent = prefix + current.toFixed(1) + suffix;
+        if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+}
+
+function renderKPIs() {
+    const totalMonth = builders.reduce((s,b) => s+b.vol_MONTH, 0);
+    const totalAll = builders.reduce((s,b) => s+b.vol_ALL, 0);
+    const totalUsers = builders.reduce((s,b) => s+b.users_MONTH, 0);
+    const top5Share = builders.slice(0,5).reduce((s,b) => s+b.vol_MONTH, 0) / totalMonth * 100;
+    const risingCount = builders.filter(b => b.rank_change >= 3).length;
+    const kpis = [
+        { label:'Monthly Total Vol', value:fmtVol(totalMonth), change:`Top 50 builders`, cls:'neutral', raw:totalMonth },
+        { label:'All-time Total Vol', value:fmtVol(totalAll), change:`${(totalMonth/totalAll*100).toFixed(1)}% this month`, cls:'up', raw:totalAll },
+        { label:'Monthly Active Users', value:fmtNum(totalUsers), change:`Across 50 projects`, cls:'neutral', raw:totalUsers },
+        { label:'Top 5 Concentration', value:top5Share.toFixed(1)+'%', change:`#1 betmoar: ${(builders[0].vol_MONTH/totalMonth*100).toFixed(1)}%`, cls:'neutral', raw:top5Share },
+        { label:'Rising Projects', value:risingCount, change:`Month rank > All rank by 3+`, cls:'up', raw:risingCount },
+    ];
+    const el = document.getElementById('kpiRow');
+    el.innerHTML = kpis.map((k,i) => `
+        <div class="kpi-card animate-in delay-${i}">
+            <div class="label">${k.label}</div>
+            <div class="value" id="kpi-${i}">${k.value}</div>
+            <div class="change ${k.cls}">${k.change}</div>
+        </div>
+    `).join('');
+    // Observe new animate-in elements
+    el.querySelectorAll('.animate-in').forEach(e => observer.observe(e));
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+const chartColors = ['#4f6ef7','#22c55e','#f97316','#ef4444','#a855f7','#06b6d4','#eab308','#ec4899','#14b8a6','#8b5cf6'];
+
+function renderVolumeChart() {
+    const top10 = builders.slice(0,10);
+    new Chart(document.getElementById('chartVolume'), {
+        type:'bar',
+        data: {
+            labels: top10.map(b => b.builder),
+            datasets: [
+                { label:'Month', data:top10.map(b => b.vol_MONTH), backgroundColor:'#4f6ef7', borderRadius:4, borderSkipped:false },
+                { label:'Week (Ã4)', data:top10.map(b => b.vol_WEEK*4), backgroundColor:'#22c55e', borderRadius:4, borderSkipped:false },
+                { label:'Day (Ã30)', data:top10.map(b => b.vol_DAY*30), backgroundColor:'#f97316', borderRadius:4, borderSkipped:false },
+            ]
+        },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            animation: { duration: 1000, easing: 'easeOutQuart' },
+            plugins: { legend:{labels:{color:'#888'}}, tooltip:{callbacks:{label:ctx => ctx.dataset.label+': '+fmtVol(ctx.raw)}} },
+            scales: { x:{ticks:{color:'#888',maxRotation:45},grid:{color:'#1a1a2e'}}, y:{ticks:{color:'#888',callback:v=>fmtVol(v)},grid:{color:'#1a1a2e'}} }
+        }
+    });
+}
+
+function renderRankChangeChart() {
+    const sorted = [...builders].filter(b => b.rank_ALL).sort((a,b) => b.rank_change - a.rank_change);
+    const top20 = sorted.slice(0,15);
+    const bottom = sorted.slice(-10).reverse();
+    const display = [...top20,...bottom].filter((v,i,a) => a.findIndex(x => x.builder===v.builder)===i);
+    new Chart(document.getElementById('chartRankChange'), {
+        type:'bar',
+        data: {
+            labels: display.map(b => b.builder),
+            datasets:[{ label:'Rank Change (AllâMonth)', data:display.map(b => b.rank_change),
+                backgroundColor:display.map(b => b.rank_change>0?'#22c55e':b.rank_change<0?'#ef4444':'#888'), borderRadius:4 }]
+        },
+        options: {
+            indexAxis:'y', responsive:true, maintainAspectRatio:false,
+            animation: { duration: 1200, easing: 'easeOutQuart', delay: ctx => ctx.dataIndex * 40 },
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>(ctx.raw>0?'â':'â')+Math.abs(ctx.raw)+' positions'}}},
+            scales:{ x:{ticks:{color:'#888'},grid:{color:'#1a1a2e'}}, y:{ticks:{color:'#e0e0e0',font:{size:11}},grid:{display:false}} }
+        }
+    });
+}
+
+function renderMomentumChart() {
+    const sorted = [...builders].filter(b => b.vol_ALL>0 && b.month_pct<200).sort((a,b) => b.month_pct-a.month_pct).slice(0,20);
+    new Chart(document.getElementById('chartMomentum'), {
+        type:'bar',
+        data: {
+            labels:sorted.map(b => b.builder),
+            datasets:[{
+                label:'Month % of All-time', data:sorted.map(b => b.month_pct),
+                backgroundColor:sorted.map(b => b.month_pct>80?'#a855f7':b.month_pct>50?'#4f6ef7':'#888'), borderRadius:4
+            }]
+        },
+        options: {
+            indexAxis:'y', responsive:true, maintainAspectRatio:false,
+            animation: { duration: 1200, easing: 'easeOutQuart', delay: ctx => ctx.dataIndex * 30 },
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw.toFixed(1)+'% of all-time volume this month'}}},
+            scales:{ x:{ticks:{color:'#888',callback:v=>v+'%'},grid:{color:'#1a1a2e'},max:100}, y:{ticks:{color:'#e0e0e0',font:{size:11}},grid:{display:false}} }
+        }
+    });
+}
+
+function renderBubbleChart() {
+    const data = builders.filter(b => b.users_MONTH>10).map((b,i) => ({x:b.users_MONTH,y:b.vol_MONTH,r:Math.max(4,Math.sqrt(b.vol_MONTH/50000)),label:b.builder}));
+    new Chart(document.getElementById('chartBubble'), {
+        type:'bubble',
+        data: { datasets:[{label:'Builders',data,backgroundColor:data.map((_,i)=>chartColors[i%chartColors.length]+'80'),borderColor:data.map((_,i)=>chartColors[i%chartColors.length]),borderWidth:1}] },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            animation: { duration: 1400, easing: 'easeOutElastic' },
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw.label+': '+fmtVol(ctx.raw.y)+', '+ctx.raw.x+' users'}}},
+            scales:{
+                x:{title:{display:true,text:'Active Users (Monthly)',color:'#888'},type:'logarithmic',ticks:{color:'#888'},grid:{color:'#1a1a2e'}},
+                y:{title:{display:true,text:'Volume (Monthly)',color:'#888'},type:'logarithmic',ticks:{color:'#888',callback:v=>fmtVol(v)},grid:{color:'#1a1a2e'}}
+            }
+        }
+    });
+}
+
+function renderConcentrationChart() {
+    const totalMonth = builders.reduce((s,b)=>s+b.vol_MONTH,0);
+    let cumPct = 0;
+    const cumData = builders.map(b => { cumPct += b.vol_MONTH/totalMonth*100; return cumPct; });
+    new Chart(document.getElementById('chartConcentration'), {
+        type:'bar',
+        data: {
+            labels:builders.map(b=>b.builder),
+            datasets:[
+                {type:'line',label:'Cumulative %',data:cumData,borderColor:'#ef4444',backgroundColor:'transparent',yAxisID:'y1',pointRadius:2,tension:0.3},
+                {label:'Month Volume',data:builders.map(b=>b.vol_MONTH),backgroundColor:'#4f6ef7',borderRadius:2,yAxisID:'y'}
+            ]
+        },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            animation: { duration: 1400, easing: 'easeOutQuart' },
+            plugins:{legend:{labels:{color:'#888'}}},
+            scales:{
+                x:{ticks:{color:'#888',maxRotation:90,font:{size:9}},grid:{display:false}},
+                y:{position:'left',ticks:{color:'#888',callback:v=>fmtVol(v)},grid:{color:'#1a1a2e'}},
+                y1:{position:'right',min:0,max:100,ticks:{color:'#ef4444',callback:v=>v+'%'},grid:{display:false}}
+            }
+        }
+    });
+}
+
+// ============================================================
+// INSIGHTS
+// ============================================================
+function renderInsights() {
+    const rising = [...builders].filter(b=>b.rank_change>=5).sort((a,b)=>b.rank_change-a.rank_change).slice(0,5);
+    const hot = [...builders].filter(b=>b.week_day_change>=5).sort((a,b)=>b.week_day_change-a.week_day_change).slice(0,5);
+    const momentum = [...builders].filter(b=>b.month_pct>50&&b.month_pct<200).sort((a,b)=>b.month_pct-a.month_pct).slice(0,5);
+    const el = document.getElementById('insightsGrid');
+    el.innerHTML = `
+        <div class="insight-card animate-in">
+            <h4>ð Rising Stars (ææåé£å)</h4>
+            ${rising.map(b=>`<div class="insight-item"><span class="builder-name">${b.builder}</span><span class="builder-stat trend-up">â${b.rank_change} (#${b.rank_ALL}â#${b.rank_MONTH})</span></div>`).join('')}
+        </div>
+        <div class="insight-card animate-in delay-1">
+            <h4>ð¥ Hot Today (ä»æ¥å¿å¤´å¼ºå²)</h4>
+            ${hot.map(b=>`<div class="insight-item"><span class="builder-name">${b.builder}</span><span class="builder-stat" style="color:#f97316">Day #${b.rank_DAY} (Week #${b.rank_WEEK})</span></div>`).join('')}
+        </div>
+        <div class="insight-card animate-in delay-2">
+            <h4>ðª High Momentum (å¢é¿å¨åæå¼º)</h4>
+            ${momentum.map(b=>`<div class="insight-item"><span class="builder-name">${b.builder}</span><span class="builder-stat" style="color:#a855f7">${b.month_pct.toFixed(0)}% of all-time</span></div>`).join('')}
+        </div>
+    `;
+    el.querySelectorAll('.animate-in').forEach(e => observer.observe(e));
+}
+
+// ============================================================
+// TABLE
+// ============================================================
+let sortCol = 'rank_MONTH', sortAsc = true, currentFilter = 'all';
+function getFilteredData() {
+    switch(currentFilter) {
+        case 'rising': return builders.filter(b=>b.rank_change>=3);
+        case 'declining': return builders.filter(b=>b.rank_change<=-3);
+        case 'hot': return builders.filter(b=>b.week_day_change>=3);
+        case 'momentum': return builders.filter(b=>b.month_pct>50&&b.month_pct<200);
+        default: return builders;
+    }
+}
+function renderTable() {
+    const data = getFilteredData();
+    const maxVol = Math.max(...data.map(b=>b.vol_MONTH));
+    data.sort((a,b) => {
+        let va=a[sortCol],vb=b[sortCol];
+        if(va===null) va=999; if(vb===null) vb=999;
+        if(sortCol==='builder') return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+        return sortAsc?va-vb:vb-va;
+    });
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = data.map((b,idx) => {
+        const rankClass = b.rank_MONTH<=3?`rank-${b.rank_MONTH}`:'rank-other';
+        const trendStr = b.rank_change>0?`<span class="trend-up">â${b.rank_change}</span>`:b.rank_change<0?`<span class="trend-down">â${Math.abs(b.rank_change)}</span>`:`<span class="trend-neutral">â</span>`;
+        const barWidth = Math.max(2,b.vol_MONTH/maxVol*80);
+        const tagHtml = b.tags.map(t=>{const labels={rising:'ð Rising',declining:'ð Declining',hot:'ð¥ Hot',momentum:'ðª Momentum',new:'ð New'};return `<span class="tag tag-${t}">${labels[t]}</span>`;}).join(' ');
+        return `<tr style="animation: rowSlide 0.4s ${idx*0.02}s both" onclick="this.classList.toggle('row-highlight')">
+            <td><span class="rank-badge ${rankClass}">${b.rank_MONTH}</span></td>
+            <td style="font-weight:600;color:#fff">${b.builder}</td>
+            <td>${fmtVol(b.vol_MONTH)}<span class="vol-bar" style="width:${barWidth}px"></span></td>
+            <td>${fmtVol(b.vol_WEEK)}</td><td>${fmtVol(b.vol_DAY)}</td>
+            <td>${b.rank_DAY||'-'}</td><td>${b.rank_WEEK||'-'}</td><td>${b.rank_ALL||'-'}</td>
+            <td>${trendStr}</td>
+            <td>${b.month_pct<200?b.month_pct.toFixed(1)+'%':'NEW'}</td>
+            <td>${fmtNum(b.users_MONTH)}</td>
+            <td>${tagHtml}</td>
+        </tr>`;
+    }).join('');
+    document.querySelectorAll('thead th').forEach(th => {
+        th.classList.remove('sorted-asc','sorted-desc');
+        if(th.dataset.col===sortCol) th.classList.add(sortAsc?'sorted-asc':'sorted-desc');
+    });
+}
+
+// Add row slide animation
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `@keyframes rowSlide { from { opacity:0; transform:translateX(-20px); } to { opacity:1; transform:translateX(0); } }`;
+document.head.appendChild(styleSheet);
+
+// Sort handlers
+document.querySelectorAll('thead th').forEach(th => {
+    th.addEventListener('click', () => {
+        const col = th.dataset.col; if(!col) return;
+        if(sortCol===col) sortAsc=!sortAsc; else { sortCol=col; sortAsc=true; }
+        renderTable();
+    });
+});
+document.getElementById('viewFilter').addEventListener('change', e => { currentFilter=e.target.value; renderTable(); });
+
+// ============================================================
+// INIT
+// ============================================================
+renderKPIs();
+renderVolumeChart();
+renderRankChangeChart();
+renderMomentumChart();
+renderBubbleChart();
+renderConcentrationChart();
+renderInsights();
+renderTable();
+</script>
+</body>
+</html>
