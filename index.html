@@ -74,8 +74,8 @@
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
         thead th { text-align: left; padding: 10px 12px; color: #888; font-weight: 600; border-bottom: 1px solid #1a1a2e; cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.2s ease; }
         thead th:hover { color: #4f6ef7; }
-        thead th.sorted-asc::after { content: ' â²'; color: #4f6ef7; }
-        thead th.sorted-desc::after { content: ' â¼'; color: #4f6ef7; }
+        thead th.sorted-asc::after { content: ' ▲'; color: #4f6ef7; }
+        thead th.sorted-desc::after { content: ' ▼'; color: #4f6ef7; }
         tbody td { padding: 10px 12px; border-bottom: 1px solid #0f0f1a; white-space: nowrap; transition: all 0.25s ease; }
         tbody tr { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); cursor: pointer; }
         tbody tr:hover { background: linear-gradient(90deg, rgba(79,110,247,0.08), transparent); transform: scale(1.005); }
@@ -135,22 +135,13 @@
 </head>
 <body>
 <div class="scroll-progress" id="scrollProgress"></div>
-<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0})">â</button>
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0})">↑</button>
 
 <div class="container">
     <header>
         <div>
             <h1><span>Polymarket</span> Builder Leaderboard Analysis</h1>
             <div class="subtitle">Data extracted: 2026-03-25 | Top 50 builders across Daily / Weekly / Monthly / All-time</div>
-        </div>
-        <div class="filters">
-            <select id="viewFilter">
-                <option value="all">All Builders (Top 50)</option>
-                <option value="rising">Rising Stars</option>
-                <option value="declining">Declining</option>
-                <option value="hot">Hot Today</option>
-                <option value="momentum">High Momentum</option>
-            </select>
         </div>
     </header>
 
@@ -159,13 +150,13 @@
     <div class="chart-row">
         <div class="chart-card animate-in">
             <h3>Volume Distribution by Timeframe</h3>
-            <div class="chart-subtitle">Top 10 builders â volume across Day/Week/Month/All</div>
+            <div class="chart-subtitle">Top 10 builders — volume across Day/Week/Month/All</div>
             <div class="chart-wrapper"><canvas id="chartVolume"></canvas></div>
             <div class="click-hint">Click any bar to highlight</div>
         </div>
         <div class="chart-card animate-in delay-1">
             <h3>Rank Movement: Month vs All-time</h3>
-            <div class="chart-subtitle">Positive = rising (ææåä¼äºå¨ææå), Negative = declining</div>
+            <div class="chart-subtitle">Positive = rising (月排名优于全期排名), Negative = declining</div>
             <div class="chart-wrapper"><canvas id="chartRankChange"></canvas></div>
             <div class="click-hint">Click any bar to highlight</div>
         </div>
@@ -173,7 +164,7 @@
 
     <div class="chart-row">
         <div class="chart-card animate-in">
-            <h3>Monthly Momentum (æVolumeå All-timeç¾åæ¯)</h3>
+            <h3>Monthly Momentum (月Volume占All-time百分比)</h3>
             <div class="chart-subtitle">Higher % = more recent growth. Projects doing most of their volume this month.</div>
             <div class="chart-wrapper"><canvas id="chartMomentum"></canvas></div>
             <div class="click-hint">Click any bar to highlight</div>
@@ -189,19 +180,19 @@
     <div class="chart-row">
         <div class="chart-card full animate-in">
             <h3>Market Concentration</h3>
-            <div class="chart-subtitle">Top 50 builders by monthly volume â shows how concentrated the market is</div>
+            <div class="chart-subtitle">Top 50 builders by monthly volume — shows how concentrated the market is</div>
             <div class="chart-wrapper"><canvas id="chartConcentration"></canvas></div>
             <div class="click-hint">Click any bar to highlight</div>
         </div>
     </div>
 
-    <h2 class="section-title animate-in">ð Key <span>Insights</span></h2>
+    <h2 class="section-title animate-in">🌟 Key <span>Insights</span></h2>
     <div class="insights-grid" id="insightsGrid"></div>
 
-    <h2 class="section-title animate-in">ð Complete <span>Leaderboard</span> Comparison</h2>
+    <h2 class="section-title animate-in">📊 Complete <span>Leaderboard</span> Comparison</h2>
     <div class="table-card animate-in">
         <h3>Cross-Timeframe Rankings</h3>
-        <div class="table-subtitle">Click column headers to sort Â· Click rows to highlight Â· Use filter to narrow results</div>
+        <div class="table-subtitle">Click column headers to sort · Click rows to highlight · Use filter to narrow results</div>
         <table id="mainTable">
             <thead>
                 <tr>
@@ -327,7 +318,7 @@ const highlightPlugin = {
                 ds.backgroundColor = origBg.map((c, i) => i === clickedIdx ? c : dimColor(c, 0.15));
                 if (Array.isArray(origBorder)) ds.borderColor = origBorder.map((c, i) => i === clickedIdx ? c : dimColor(c, 0.15));
             } else {
-                // Single color datasets â dim if not the clicked dataset
+                // Single color datasets — dim if not the clicked dataset
                 if (chart.data.datasets.length > 1) {
                     ds.backgroundColor = dsIdx === clickedDsIdx ? origBg : dimColor(origBg, 0.2);
                 } else {
@@ -419,8 +410,8 @@ function renderVolumeChart() {
             labels: top10.map(b => b.builder),
             datasets: [
                 { label:'Month', data:top10.map(b => b.vol_MONTH), backgroundColor:'#4f6ef7', borderRadius:4, borderSkipped:false },
-                { label:'Week (Ã4)', data:top10.map(b => b.vol_WEEK*4), backgroundColor:'#22c55e', borderRadius:4, borderSkipped:false },
-                { label:'Day (Ã30)', data:top10.map(b => b.vol_DAY*30), backgroundColor:'#f97316', borderRadius:4, borderSkipped:false },
+                { label:'Week (×4)', data:top10.map(b => b.vol_WEEK*4), backgroundColor:'#22c55e', borderRadius:4, borderSkipped:false },
+                { label:'Day (×30)', data:top10.map(b => b.vol_DAY*30), backgroundColor:'#f97316', borderRadius:4, borderSkipped:false },
             ]
         },
         options: {
@@ -441,13 +432,13 @@ function renderRankChangeChart() {
         type:'bar',
         data: {
             labels: display.map(b => b.builder),
-            datasets:[{ label:'Rank Change (AllâMonth)', data:display.map(b => b.rank_change),
+            datasets:[{ label:'Rank Change (All→Month)', data:display.map(b => b.rank_change),
                 backgroundColor:display.map(b => b.rank_change>0?'#22c55e':b.rank_change<0?'#ef4444':'#888'), borderRadius:4 }]
         },
         options: {
             indexAxis:'y', responsive:true, maintainAspectRatio:false,
             animation: { duration: 1200, easing: 'easeOutQuart', delay: ctx => ctx.dataIndex * 40 },
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>(ctx.raw>0?'â':'â')+Math.abs(ctx.raw)+' positions'}}},
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>(ctx.raw>0?'↑':'↓')+Math.abs(ctx.raw)+' positions'}}},
             scales:{ x:{ticks:{color:'#888'},grid:{color:'#1a1a2e'}}, y:{ticks:{color:'#e0e0e0',font:{size:11}},grid:{display:false}} }
         }
     });
@@ -526,15 +517,15 @@ function renderInsights() {
     const el = document.getElementById('insightsGrid');
     el.innerHTML = `
         <div class="insight-card animate-in">
-            <h4>ð Rising Stars (ææåé£å)</h4>
-            ${rising.map(b=>`<div class="insight-item"><span class="builder-name">${b.builder}</span><span class="builder-stat trend-up">â${b.rank_change} (#${b.rank_ALL}â#${b.rank_MONTH})</span></div>`).join('')}
+            <h4>🌟 Rising Stars (月排名飙升)</h4>
+            ${rising.map(b=>`<div class="insight-item"><span class="builder-name">${b.builder}</span><span class="builder-stat trend-up">↑${b.rank_change} (#${b.rank_ALL}→#${b.rank_MONTH})</span></div>`).join('')}
         </div>
         <div class="insight-card animate-in delay-1">
-            <h4>ð¥ Hot Today (ä»æ¥å¿å¤´å¼ºå²)</h4>
+            <h4>🔥 Hot Today (今日势头强劲)</h4>
             ${hot.map(b=>`<div class="insight-item"><span class="builder-name">${b.builder}</span><span class="builder-stat" style="color:#f97316">Day #${b.rank_DAY} (Week #${b.rank_WEEK})</span></div>`).join('')}
         </div>
         <div class="insight-card animate-in delay-2">
-            <h4>ðª High Momentum (å¢é¿å¨åæå¼º)</h4>
+            <h4>💪 High Momentum (增长动力最强)</h4>
             ${momentum.map(b=>`<div class="insight-item"><span class="builder-name">${b.builder}</span><span class="builder-stat" style="color:#a855f7">${b.month_pct.toFixed(0)}% of all-time</span></div>`).join('')}
         </div>
     `;
@@ -566,9 +557,9 @@ function renderTable() {
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = data.map((b,idx) => {
         const rankClass = b.rank_MONTH<=3?`rank-${b.rank_MONTH}`:'rank-other';
-        const trendStr = b.rank_change>0?`<span class="trend-up">â${b.rank_change}</span>`:b.rank_change<0?`<span class="trend-down">â${Math.abs(b.rank_change)}</span>`:`<span class="trend-neutral">â</span>`;
+        const trendStr = b.rank_change>0?`<span class="trend-up">↑${b.rank_change}</span>`:b.rank_change<0?`<span class="trend-down">↓${Math.abs(b.rank_change)}</span>`:`<span class="trend-neutral">→</span>`;
         const barWidth = Math.max(2,b.vol_MONTH/maxVol*80);
-        const tagHtml = b.tags.map(t=>{const labels={rising:'ð Rising',declining:'ð Declining',hot:'ð¥ Hot',momentum:'ðª Momentum',new:'ð New'};return `<span class="tag tag-${t}">${labels[t]}</span>`;}).join(' ');
+        const tagHtml = b.tags.map(t=>{const labels={rising:'🌟 Rising',declining:'📉 Declining',hot:'🔥 Hot',momentum:'💪 Momentum',new:'🆕 New'};return `<span class="tag tag-${t}">${labels[t]}</span>`;}).join(' ');
         return `<tr style="animation: rowSlide 0.4s ${idx*0.02}s both" onclick="this.classList.toggle('row-highlight')">
             <td><span class="rank-badge ${rankClass}">${b.rank_MONTH}</span></td>
             <td style="font-weight:600;color:#fff">${b.builder}</td>
@@ -600,7 +591,7 @@ document.querySelectorAll('thead th').forEach(th => {
         renderTable();
     });
 });
-document.getElementById('viewFilter').addEventListener('change', e => { currentFilter=e.target.value; renderTable(); });
+// Filter removed for simplicity
 
 // ============================================================
 // INIT
